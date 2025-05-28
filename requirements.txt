@@ -1,0 +1,7 @@
+tensorflow
+flask
+pillow
+pandas
+matplotlib
+numpy
+requests

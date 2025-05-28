@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scenes Classification</title>
+  <link rel="icon" href="{{ url_for('static', filename='landscape.png') }}" type="image/png" />
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #f0f4f8;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    .container {
+      margin-top: 60px;
+      max-width: 650px;
+    }
+
+    .card {
+      background-color: white;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      color: #333;
+      border: 2px solid #4169E1;
+    }
+
+    h2 {
+      font-weight: bold;
+      margin-bottom: 30px;
+      color: #4169E1;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background-color: #4169E1;
+      border-color: #4169E1;
+      color: white;
+      transition: all 0.3s ease-in-out;
+    }
+
+    .btn-primary:hover {
+      background-color: #3151a1;
+      border-color: #3151a1;
+      transform: scale(1.03);
+    }
+
+    .btn-primary:disabled {
+      background-color: #cccccc;
+      border-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    .image-preview {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 10px;
+      margin-top: 15px;
+      border: 2px solid #4169E1;
+      display: none;
+    }
+
+    .result-box {
+      background-color: #f0f4f8;
+      padding: 25px;
+      border-radius: 16px;
+      margin-top: 25px;
+      text-align: center;
+      border: 1px solid #4169E1;
+    }
+
+    .result-box h4 {
+      color: #4169E1;
+      margin: 10px 0;
+      font-weight: 600;
+    }
+
+    .flash-message {
+      background-color: #dc3545;
+      padding: 10px;
+      color: white;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    label {
+      font-weight: 500;
+      color: #4169E1;
+    }
+
+    .radio-group {
+      margin: 20px 0;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #4169E1;
+      font-weight: 500;
+    }
+
+    .form-control, .form-control:disabled {
+      border: 2px solid #4169E1;
+      border-radius: 5px;
+      padding: 12px;
+      font-size: 16px;
+    }
+
+    .form-control:disabled {
+      background-color: #e6e6e6;
+      cursor: not-allowed;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>🏞️ Scenes Classification</h2>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash-message">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    <form id="uploadForm" enctype="multipart/form-data">
+      <div class="radio-group">
+        <label><input type="radio" name="input-type" value="upload" checked> Upload Scene Image</label>
+        <label><input type="radio" name="input-type" value="url"> Image URL</label>
+      </div>
+      <div id="upload-input" class="mb-3">
+        <label for="image" class="form-label">Upload a scene image:</label>
+        <input class="form-control" type="file" id="image" name="image" accept=".jpg,.jpeg,.png" />
+      </div>
+      <div id="url-input" class="mb-3 hidden">
+        <label for="image_url" class="form-label">Enter scene image URL:</label>
+        <input class="form-control" type="text" id="image_url" name="image_url" placeholder="Enter image URL" />
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Classify Scene</button>
+    </form>
+
+    <div id="result-box" class="result-box" style="display: none;">
+      <h4 id="result-text"></h4>
+      <img id="preview-image" src="" class="image-preview" alt="Uploaded Image" />
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const uploadInput = document.getElementById('upload-input');
+  const urlInput = document.getElementById('url-input');
+  const imageInput = document.getElementById('image');
+  const urlInputField = document.getElementById('image_url');
+  const submitButton = document.querySelector('button[type="submit"]');
+  const radioButtons = document.querySelectorAll('input[name="input-type"]');
+  const resultBox = document.getElementById('result-box');
+  const resultText = document.getElementById('result-text');
+  const previewImage = document.getElementById('preview-image');
+
+  // Toggle input fields based on radio selection
+  radioButtons.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.value === 'upload') {
+        uploadInput.classList.remove('hidden');
+        urlInput.classList.add('hidden');
+        imageInput.disabled = false;
+        urlInputField.disabled = true;
+        urlInputField.value = '';
+      } else {
+        uploadInput.classList.add('hidden');
+        urlInput.classList.remove('hidden');
+        imageInput.disabled = true;
+        urlInputField.disabled = false;
+        imageInput.value = '';
+      }
+    });
+  });
+
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitButton.disabled = true;
+    resultBox.style.display = 'none';
+    resultText.innerText = 'Processing...';
+    previewImage.style.display = 'none';
+
+    const formData = new FormData();
+    const inputType = document.querySelector('input[name="input-type"]:checked').value;
+
+    if (inputType === 'upload' && imageInput.files.length > 0) {
+      formData.append('image', imageInput.files[0]);
+      // Display preview of uploaded image
+      const reader = new FileReader();
+      reader.onload = () => {
+        previewImage.src = reader.result;
+        previewImage.style.display = 'block';
+      };
+      reader.readAsDataURL(imageInput.files[0]);
+    } else if (inputType === 'url' && urlInputField.value) {
+      formData.append('image_url', urlInputField.value);
+      // Display preview of URL image
+      previewImage.src = urlInputField.value;
+      previewImage.style.display = 'block';
+    } else {
+      resultText.innerText = 'Please provide an image or URL.';
+      submitButton.disabled = false;
+      return;
+    }
+
+    try {
+      const response = await fetch('/predict', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await response.json();
+
+      if (response.ok) {
+        resultText.innerText = `Prediction: ${result.prediction}`;
+        resultBox.style.display = 'block';
+      } else {
+        resultText.innerText = `Error: ${result.error}`;
+        resultBox.style.display = 'block';
+        previewImage.style.display = 'none';
+      }
+    } catch (error) {
+      resultText.innerText = `Error: ${error.message}`;
+      resultBox.style.display = 'block';
+      previewImage.style.display = 'none';
+    }
+    submitButton.disabled = false;
+  });
+</script>
+</body>
+</html>
