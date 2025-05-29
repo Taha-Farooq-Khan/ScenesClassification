@@ -1,0 +1,56 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  imageRepository: class_app
+  containerRegistry: scenesclassificationacr.azurecr.io
+  dockerfilePath: $(Build.SourcesDirectory)/Dockerfile
+  tag: $(Build.BuildId)
+  aksCluster: scenesclassificationakss
+  resourceGroup: ScenesClassificationRG
+
+stages:
+  - stage: Build
+    displayName: Build and push stage
+    jobs:
+      - job: Build
+        displayName: Build and push image
+        steps:
+          - task: Docker@2
+            displayName: Build and push image to ACR
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: acr-connection
+              tags: |
+                $(tag)
+          - task: PublishBuildArtifacts@1
+            displayName: Publish k8s manifests
+            inputs:
+              pathToPublish: $(Build.SourcesDirectory)/k8s
+              artifactName: manifests
+              publishLocation: Container
+
+  - stage: Deploy
+    displayName: Deploy to AKS
+    dependsOn: Build
+    jobs:
+      - job: Deploy
+        displayName: Deploy to AKS
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: manifests
+              path: $(Build.SourcesDirectory)/k8s
+          - task: KubernetesManifest@0
+            displayName: Deploy to AKS
+            inputs:
+              action: deploy
+              kubernetesServiceConnection: aks-connection
+              manifests: |
+                $(Build.SourcesDirectory)/k8s/deployment.yaml
+                $(Build.SourcesDirectory)/k8s/service.yaml
