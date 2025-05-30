@@ -2,7 +2,7 @@
 FROM python:3.9-slim
 
 # Update the package list and install essential system packages
-RUN apt-get update && apt-get install -y \
+RUN apt-get install -y \
     gcc \
     python3-dev \
     && apt-get clean \
